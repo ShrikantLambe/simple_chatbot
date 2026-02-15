@@ -27,13 +27,23 @@ app.config['JSON_SORT_KEYS'] = False
 # Initialize Session
 Session(app)
 
-# Initialize OpenAI client - it automatically uses OPENAI_API_KEY env variable
-# Validate that API key is set
-if not os.getenv("OPENAI_API_KEY"):
-    raise ValueError(
-        "OPENAI_API_KEY environment variable is not set. Please set it before running the app.")
+# Initialize OpenAI client lazily on first use
+_openai_client = None
 
-client = OpenAI()  # OpenAI client auto-detects OPENAI_API_KEY from environment
+
+def get_openai_client():
+    """Get or initialize OpenAI client"""
+    global _openai_client
+    if _openai_client is None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "❌ OPENAI_API_KEY environment variable is not set. "
+                "Please set it in your Render environment variables before running the app."
+            )
+        _openai_client = OpenAI(api_key=api_key)
+    return _openai_client
+
 
 # API Keys from environment
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
@@ -88,7 +98,7 @@ def get_news(topic="general"):
 def get_chatbot_response(messages):
     """Get chatbot response using OpenAI Chat Completions API with conversation history"""
     try:
-        response = client.chat.completions.create(
+        response = get_openai_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=messages,
             max_tokens=300,
@@ -150,6 +160,17 @@ def clear():
     session.pop('history', None)
     session.modified = True
     return jsonify({'status': 'success', 'message': 'Chat history cleared'})
+
+
+@app.route('/debug', methods=['GET'])
+def debug():
+    """Debug endpoint to check environment variables (remove in production)"""
+    return jsonify({
+        'openai_api_key_set': bool(os.getenv('OPENAI_API_KEY')),
+        'flask_env': os.getenv('FLASK_ENV', 'development'),
+        'port': os.getenv('PORT', '5000'),
+        'app_running': True
+    })
 
 
 if __name__ == '__main__':
