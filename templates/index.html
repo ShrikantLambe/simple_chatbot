@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -69,6 +70,7 @@
                 opacity: 0;
                 transform: translateY(10px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -177,9 +179,13 @@
         }
 
         @keyframes blink {
-            0%, 60%, 100% {
+
+            0%,
+            60%,
+            100% {
                 opacity: 0.3;
             }
+
             30% {
                 opacity: 1;
             }
@@ -199,6 +205,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -209,12 +216,8 @@
         <div class="chat-box" id="chatBox"></div>
 
         <div class="input-area">
-            <input 
-                type="text" 
-                id="messageInput" 
-                placeholder="Type a message... (e.g., 'hello', 'weather london', 'news python')"
-                autocomplete="off"
-            >
+            <input type="text" id="messageInput"
+                placeholder="Type a message... (e.g., 'hello', 'weather london', 'news python')" autocomplete="off">
             <button id="sendBtn">📤</button>
         </div>
 
@@ -233,48 +236,65 @@
 
         // Send message on Enter key
         messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey) {
                 sendMessage();
             }
         });
 
         function sendMessage() {
-            const message = messageInput.value.trim();
-            if (!message) return;
+            const userInput = messageInput.value.trim();
 
-            // Display user message
-            displayMessage(message, 'user');
+            // Validate input
+            if (!userInput) return;
+
+            // Display user message immediately
+            displayMessage(userInput, 'user');
+
+            // Clear input box
             messageInput.value = '';
+            messageInput.focus();
 
             // Show loading state
             displayMessage('...', 'bot-loading');
 
-            // Send to backend
+            // Send POST request to /chat
             fetch('/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ message: message })
+                body: JSON.stringify({ message: userInput })
             })
-            .then(response => response.json())
-            .then(data => {
-                // Remove loading message
-                const loadingMsg = chatBox.lastChild;
-                if (loadingMsg && loadingMsg.classList.contains('bot-loading-msg')) {
-                    loadingMsg.remove();
-                }
-                // Display bot response
-                displayMessage(data.response, 'bot');
-            })
-            .catch(error => {
-                const loadingMsg = chatBox.lastChild;
-                if (loadingMsg && loadingMsg.classList.contains('bot-loading-msg')) {
-                    loadingMsg.remove();
-                }
-                displayMessage('Sorry, an error occurred. Please try again.', 'bot');
-                console.error('Error:', error);
-            });
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Remove loading message
+                    removeLoadingMessage();
+
+                    // Display bot response after fetch completes
+                    if (data.response) {
+                        displayMessage(data.response, 'bot');
+                    } else if (data.error) {
+                        displayMessage(`Error: ${data.error}`, 'bot');
+                    }
+                })
+                .catch(error => {
+                    // Handle errors gracefully
+                    removeLoadingMessage();
+                    console.error('Error:', error);
+                    displayMessage('Sorry, an error occurred. Please try again.', 'bot');
+                });
+        }
+
+        function removeLoadingMessage() {
+            const loadingMsg = chatBox.querySelector('.bot-loading-msg');
+            if (loadingMsg) {
+                loadingMsg.remove();
+            }
         }
 
         function displayMessage(message, sender) {
@@ -298,13 +318,15 @@
             }
 
             chatBox.appendChild(messageDiv);
+            // Auto-scroll to latest message
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         // Initial greeting
         window.addEventListener('load', () => {
-            displayMessage('👋 Hello! I\'m your chatbot. How can I help you today?', 'bot');
+            displayMessage('👋 Hello! I\'m your chatbot. Ask me anything!', 'bot');
         });
     </script>
 </body>
+
 </html>
