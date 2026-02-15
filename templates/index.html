@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -39,6 +40,14 @@
             color: white;
             padding: 20px;
             text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-content {
+            flex: 1;
+            text-align: center;
         }
 
         .header h1 {
@@ -49,6 +58,27 @@
         .header p {
             font-size: 12px;
             opacity: 0.9;
+        }
+
+        .clear-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            padding: 8px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .clear-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .clear-btn:active {
+            transform: scale(0.95);
         }
 
         .chat-box {
@@ -69,6 +99,7 @@
                 opacity: 0;
                 transform: translateY(10px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -158,31 +189,47 @@
             border-top: 1px solid #eee;
         }
 
-        .loading {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #667eea;
-            margin: 0 2px;
-            animation: blink 1.4s infinite;
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
 
-        .loading:nth-child(2) {
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #667eea;
+            animation: typeBlink 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) {
             animation-delay: 0.2s;
         }
 
-        .loading:nth-child(3) {
+        .typing-dot:nth-child(3) {
             animation-delay: 0.4s;
         }
 
-        @keyframes blink {
-            0%, 60%, 100% {
-                opacity: 0.3;
+        @keyframes typeBlink {
+
+            0%,
+            60%,
+            100% {
+                opacity: 0.4;
+                transform: translateY(0);
             }
+
             30% {
                 opacity: 1;
+                transform: translateY(-6px);
             }
+        }
+
+        .typing-text {
+            font-style: italic;
+            color: #999;
+            font-size: 13px;
         }
 
         /* Responsive */
@@ -199,22 +246,23 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
-            <h1>🤖 Simple Chatbot</h1>
-            <p>Chat with AI - Ask anything!</p>
+            <div></div>
+            <div class="header-content">
+                <h1>🤖 Simple Chatbot</h1>
+                <p>Chat with AI - Ask anything!</p>
+            </div>
+            <button id="clearBtn" class="clear-btn">🗑️ Clear</button>
         </div>
 
         <div class="chat-box" id="chatBox"></div>
 
         <div class="input-area">
-            <input 
-                type="text" 
-                id="messageInput" 
-                placeholder="Type a message... (e.g., 'hello', 'weather london', 'news python')"
-                autocomplete="off"
-            >
+            <input type="text" id="messageInput"
+                placeholder="Type a message... (e.g., 'hello', 'weather london', 'news python')" autocomplete="off">
             <button id="sendBtn">📤</button>
         </div>
 
@@ -227,84 +275,138 @@
         const chatBox = document.getElementById('chatBox');
         const messageInput = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
+        const clearBtn = document.getElementById('clearBtn');
 
         // Send message on button click
         sendBtn.addEventListener('click', sendMessage);
 
         // Send message on Enter key
         messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey) {
                 sendMessage();
             }
         });
 
+        // Clear chat on button click
+        clearBtn.addEventListener('click', clearChat);
+
         function sendMessage() {
-            const message = messageInput.value.trim();
-            if (!message) return;
+            const userInput = messageInput.value.trim();
 
-            // Display user message
-            displayMessage(message, 'user');
+            // Validate input
+            if (!userInput) return;
+
+            // Display user message immediately
+            displayMessage(userInput, 'user');
+
+            // Clear input box
             messageInput.value = '';
+            messageInput.focus();
 
-            // Show loading state
-            displayMessage('...', 'bot-loading');
+            // Show "Bot is typing..." indicator
+            showTypingIndicator();
 
-            // Send to backend
+            // Send POST request to /chat
             fetch('/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ message: message })
+                body: JSON.stringify({ message: userInput })
             })
-            .then(response => response.json())
-            .then(data => {
-                // Remove loading message
-                const loadingMsg = chatBox.lastChild;
-                if (loadingMsg && loadingMsg.classList.contains('bot-loading-msg')) {
-                    loadingMsg.remove();
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Remove loading message
+                    removeLoadingMessage();
+
+                    // Display bot response after fetch completes
+                    if (data.response) {
+                        displayMessage(data.response, 'bot');
+                    } else if (data.error) {
+                        displayMessage(`Error: ${data.error}`, 'bot');
+                    }
+                })
+                .catch(error => {
+                    // Handle errors gracefully
+                    removeLoadingMessage();
+                    console.error('Error:', error);
+                    displayMessage('Sorry, an error occurred. Please try again.', 'bot');
+                });
+        }
+
+        function clearChat() {
+            // Send POST request to /clear
+            fetch('/clear', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
                 }
-                // Display bot response
-                displayMessage(data.response, 'bot');
             })
-            .catch(error => {
-                const loadingMsg = chatBox.lastChild;
-                if (loadingMsg && loadingMsg.classList.contains('bot-loading-msg')) {
-                    loadingMsg.remove();
-                }
-                displayMessage('Sorry, an error occurred. Please try again.', 'bot');
-                console.error('Error:', error);
-            });
+                .then(response => response.json())
+                .then(data => {
+                    // Clear chat UI
+                    chatBox.innerHTML = '';
+                    // Show greeting
+                    displayMessage('👋 Hello! I\'m your chatbot. Ask me anything!', 'bot');
+                })
+                .catch(error => {
+                    console.error('Error clearing chat:', error);
+                    alert('Failed to clear chat. Please try again.');
+                });
+        }
+
+        function removeLoadingMessage() {
+            const typingMsg = chatBox.querySelector('.bot-typing-msg');
+            if (typingMsg) {
+                typingMsg.remove();
+            }
+        }
+
+        function showTypingIndicator() {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot-message';
+            messageDiv.classList.add('bot-typing-msg');
+
+            messageDiv.innerHTML = `
+                <div class="message-text">
+                    <span class="typing-text">Bot is typing</span>
+                    <div class="typing-indicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+            `;
+
+            chatBox.appendChild(messageDiv);
+            // Auto-scroll to latest message
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         function displayMessage(message, sender) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${sender}-message`;
 
-            if (sender === 'bot-loading') {
-                messageDiv.classList.add('bot-loading-msg');
-                messageDiv.innerHTML = `
-                    <div class="message-text">
-                        <div class="loading"></div>
-                        <div class="loading"></div>
-                        <div class="loading"></div>
-                    </div>
-                `;
-            } else {
-                const textDiv = document.createElement('div');
-                textDiv.className = 'message-text';
-                textDiv.textContent = message;
-                messageDiv.appendChild(textDiv);
-            }
+            const textDiv = document.createElement('div');
+            textDiv.className = 'message-text';
+            textDiv.textContent = message;
+            messageDiv.appendChild(textDiv);
 
             chatBox.appendChild(messageDiv);
+            // Auto-scroll to latest message
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         // Initial greeting
         window.addEventListener('load', () => {
-            displayMessage('👋 Hello! I\'m your chatbot. How can I help you today?', 'bot');
+            displayMessage('👋 Hello! I\'m your chatbot. Ask me anything!', 'bot');
         });
     </script>
 </body>
+
 </html>

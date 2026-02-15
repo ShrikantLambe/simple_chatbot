@@ -1,12 +1,38 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
+from flask_session import Session
 import requests
 from datetime import datetime
+import os
+from dotenv import load_dotenv
+from openai import OpenAI
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 
-# API Keys
-WEATHER_API_KEY = "5b2379fef77321fc6eb8deaca147d101"
-NEWS_API_KEY = "8fb3025f05834eb6a8698df256c8ce6a"
+# Configure Flask-Session for production
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_PERMANENT'] = False
+app.config['SESSION_USE_SIGNER'] = True
+# Use environment variable to control secure cookies in production
+app.config['SESSION_COOKIE_SECURE'] = os.getenv(
+    'FLASK_ENV', 'development') == 'production'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SECRET_KEY'] = os.getenv(
+    'SECRET_KEY', 'dev-key-change-in-production')
+app.config['JSON_SORT_KEYS'] = False
+
+# Initialize Session
+Session(app)
+
+# Initialize OpenAI client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# API Keys from environment
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 
 
 def get_weather(city):
@@ -54,41 +80,18 @@ def get_news(topic="general"):
         return f"Error fetching news: {str(e)}"
 
 
-def get_chatbot_response(user_input):
-    """Get chatbot response based on user input"""
-    user_input = user_input.strip().lower()
-
-    responses = {
-        "hello": "Hi there! How are you doing today?",
-        "hi": "Hello! Nice to meet you!",
-        "how are you": "I'm doing great! Thanks for asking!",
-        "what is your name": "I'm a simple chatbot. No name yet, but you can call me Bot!",
-        "who are you": "I'm a simple chatbot here to chat with you!",
-        "bye": "Goodbye! Have a great day!",
-        "goodbye": "See you later! Take care!",
-        "help": "I can chat with you! Try: 'hello', 'weather [city]', 'news [topic]', or 'time'",
-        "python": "Python is an awesome programming language!",
-        "thanks": "You're welcome!",
-        "thank you": "Happy to help!",
-        "time": f"Current time: {datetime.now().strftime('%H:%M:%S')}",
-    }
-
-    # Check for weather command
-    if user_input.startswith("weather "):
-        city = user_input.replace("weather ", "").strip()
-        return get_weather(city)
-
-    # Check for news command
-    if user_input.startswith("news "):
-        topic = user_input.replace("news ", "").strip()
-        return get_news(topic)
-
-    # Check if user input matches any of our responses
-    for keyword, response in responses.items():
-        if keyword in user_input:
-            return response
-
-    return "I'm not sure how to respond to that. Try saying 'hello' or 'help'!"
+def get_chatbot_response(messages):
+    """Get chatbot response using OpenAI Chat Completions API with conversation history"""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            max_tokens=300,
+            temperature=0.7
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Error getting response from AI: {str(e)}"
 
 
 @app.route('/')
@@ -99,18 +102,51 @@ def home():
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    """API endpoint for handling chat messages"""
+    """API endpoint for handling chat messages with conversation history"""
     data = request.get_json()
     user_message = data.get('message', '')
 
     if not user_message:
         return jsonify({'error': 'Empty message'}), 400
 
-    bot_response = get_chatbot_response(user_message)
+    # Initialize conversation history if it doesn't exist
+    if 'history' not in session:
+        session['history'] = [
+            {
+                "role": "system",
+                "content": "You are a helpful and professional AI assistant."
+            }
+        ]
+
+    # Append user message to history
+    session['history'].append({
+        "role": "user",
+        "content": user_message
+    })
+
+    # Get response from OpenAI with full conversation history
+    bot_response = get_chatbot_response(session['history'])
+
+    # Append assistant response to history
+    session['history'].append({
+        "role": "assistant",
+        "content": bot_response
+    })
+
+    # Save session
+    session.modified = True
+
     return jsonify({'response': bot_response})
 
 
+@app.route('/clear', methods=['POST'])
+def clear():
+    """API endpoint for clearing conversation history"""
+    session.pop('history', None)
+    session.modified = True
+    return jsonify({'status': 'success', 'message': 'Chat history cleared'})
+
+
 if __name__ == '__main__':
-    import os
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
