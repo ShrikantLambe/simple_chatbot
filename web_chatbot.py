@@ -83,7 +83,9 @@ def get_chatbot_response(messages):
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=messages
+            messages=messages,
+            max_tokens=300,
+            temperature=0.7
         )
         return response.choices[0].message.content
     except Exception as e:
