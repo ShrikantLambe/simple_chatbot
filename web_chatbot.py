@@ -27,8 +27,13 @@ app.config['JSON_SORT_KEYS'] = False
 # Initialize Session
 Session(app)
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Initialize OpenAI client - it automatically uses OPENAI_API_KEY env variable
+# Validate that API key is set
+if not os.getenv("OPENAI_API_KEY"):
+    raise ValueError(
+        "OPENAI_API_KEY environment variable is not set. Please set it before running the app.")
+
+client = OpenAI()  # OpenAI client auto-detects OPENAI_API_KEY from environment
 
 # API Keys from environment
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
