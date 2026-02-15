@@ -160,35 +160,47 @@
             border-top: 1px solid #eee;
         }
 
-        .loading {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #667eea;
-            margin: 0 2px;
-            animation: blink 1.4s infinite;
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
 
-        .loading:nth-child(2) {
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #667eea;
+            animation: typeBlink 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) {
             animation-delay: 0.2s;
         }
 
-        .loading:nth-child(3) {
+        .typing-dot:nth-child(3) {
             animation-delay: 0.4s;
         }
 
-        @keyframes blink {
+        @keyframes typeBlink {
 
             0%,
             60%,
             100% {
-                opacity: 0.3;
+                opacity: 0.4;
+                transform: translateY(0);
             }
 
             30% {
                 opacity: 1;
+                transform: translateY(-6px);
             }
+        }
+
+        .typing-text {
+            font-style: italic;
+            color: #999;
+            font-size: 13px;
         }
 
         /* Responsive */
@@ -254,8 +266,8 @@
             messageInput.value = '';
             messageInput.focus();
 
-            // Show loading state
-            displayMessage('...', 'bot-loading');
+            // Show "Bot is typing..." indicator
+            showTypingIndicator();
 
             // Send POST request to /chat
             fetch('/chat', {
@@ -291,31 +303,41 @@
         }
 
         function removeLoadingMessage() {
-            const loadingMsg = chatBox.querySelector('.bot-loading-msg');
-            if (loadingMsg) {
-                loadingMsg.remove();
+            const typingMsg = chatBox.querySelector('.bot-typing-msg');
+            if (typingMsg) {
+                typingMsg.remove();
             }
+        }
+
+        function showTypingIndicator() {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot-message';
+            messageDiv.classList.add('bot-typing-msg');
+
+            messageDiv.innerHTML = `
+                <div class="message-text">
+                    <span class="typing-text">Bot is typing</span>
+                    <div class="typing-indicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+            `;
+
+            chatBox.appendChild(messageDiv);
+            // Auto-scroll to latest message
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         function displayMessage(message, sender) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${sender}-message`;
 
-            if (sender === 'bot-loading') {
-                messageDiv.classList.add('bot-loading-msg');
-                messageDiv.innerHTML = `
-                    <div class="message-text">
-                        <div class="loading"></div>
-                        <div class="loading"></div>
-                        <div class="loading"></div>
-                    </div>
-                `;
-            } else {
-                const textDiv = document.createElement('div');
-                textDiv.className = 'message-text';
-                textDiv.textContent = message;
-                messageDiv.appendChild(textDiv);
-            }
+            const textDiv = document.createElement('div');
+            textDiv.className = 'message-text';
+            textDiv.textContent = message;
+            messageDiv.appendChild(textDiv);
 
             chatBox.appendChild(messageDiv);
             // Auto-scroll to latest message
