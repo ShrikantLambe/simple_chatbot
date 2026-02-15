@@ -5,10 +5,6 @@ from datetime import datetime
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
-try:
-    import httpx
-except ImportError:
-    httpx = None
 
 # Load environment variables from .env file
 load_dotenv()
@@ -45,26 +41,9 @@ def get_openai_client():
                 "❌ OPENAI_API_KEY environment variable is not set. "
                 "Please set it in your Render environment variables before running the app."
             )
-        try:
-            # Initialize OpenAI client with explicit api_key only
-            _openai_client = OpenAI(api_key=api_key)
-        except TypeError as e:
-            error_msg = str(e)
-            if "proxies" in error_msg.lower():
-                # If there's a proxies error, try with httpx client
-                if httpx:
-                    try:
-                        http_client = httpx.Client(verify=True, proxies=None)
-                        _openai_client = OpenAI(
-                            api_key=api_key, http_client=http_client)
-                    except Exception as fallback_error:
-                        raise ValueError(
-                            f"Failed to initialize OpenAI client: {fallback_error}")
-                else:
-                    raise ValueError(
-                        "httpx not available to work around proxy issue")
-            else:
-                raise
+        # Initialize OpenAI client - simple and direct
+        # The library will use the api_key automatically
+        _openai_client = OpenAI(api_key=api_key)
     return _openai_client
 
 
