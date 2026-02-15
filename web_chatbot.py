@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
+from flask_session import Session
 import requests
 from datetime import datetime
 import os
@@ -9,6 +10,20 @@ from openai import OpenAI
 load_dotenv()
 
 app = Flask(__name__)
+
+# Configure Flask-Session
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_PERMANENT'] = False
+app.config['SESSION_USE_SIGNER'] = True
+# Set to True in production with HTTPS
+app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SECRET_KEY'] = os.getenv(
+    'SECRET_KEY', 'dev-key-change-in-production')
+
+# Initialize Session
+Session(app)
 
 # Initialize OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -63,21 +78,12 @@ def get_news(topic="general"):
         return f"Error fetching news: {str(e)}"
 
 
-def get_chatbot_response(user_input):
-    """Get chatbot response using OpenAI Chat Completions API"""
+def get_chatbot_response(messages):
+    """Get chatbot response using OpenAI Chat Completions API with conversation history"""
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a helpful and professional AI assistant."
-                },
-                {
-                    "role": "user",
-                    "content": user_input
-                }
-            ]
+            messages=messages
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -92,14 +98,40 @@ def home():
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    """API endpoint for handling chat messages"""
+    """API endpoint for handling chat messages with conversation history"""
     data = request.get_json()
     user_message = data.get('message', '')
 
     if not user_message:
         return jsonify({'error': 'Empty message'}), 400
 
-    bot_response = get_chatbot_response(user_message)
+    # Initialize conversation history if it doesn't exist
+    if 'history' not in session:
+        session['history'] = [
+            {
+                "role": "system",
+                "content": "You are a helpful and professional AI assistant."
+            }
+        ]
+
+    # Append user message to history
+    session['history'].append({
+        "role": "user",
+        "content": user_message
+    })
+
+    # Get response from OpenAI with full conversation history
+    bot_response = get_chatbot_response(session['history'])
+
+    # Append assistant response to history
+    session['history'].append({
+        "role": "assistant",
+        "content": bot_response
+    })
+
+    # Save session
+    session.modified = True
+
     return jsonify({'response': bot_response})
 
 
