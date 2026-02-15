@@ -11,16 +11,18 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Configure Flask-Session
+# Configure Flask-Session for production
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
-# Set to True in production with HTTPS
-app.config['SESSION_COOKIE_SECURE'] = False
+# Use environment variable to control secure cookies in production
+app.config['SESSION_COOKIE_SECURE'] = os.getenv(
+    'FLASK_ENV', 'development') == 'production'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SECRET_KEY'] = os.getenv(
     'SECRET_KEY', 'dev-key-change-in-production')
+app.config['JSON_SORT_KEYS'] = False
 
 # Initialize Session
 Session(app)
