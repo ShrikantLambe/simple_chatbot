@@ -64,40 +64,24 @@ def get_news(topic="general"):
 
 
 def get_chatbot_response(user_input):
-    """Get chatbot response based on user input"""
-    user_input = user_input.strip().lower()
-
-    responses = {
-        "hello": "Hi there! How are you doing today?",
-        "hi": "Hello! Nice to meet you!",
-        "how are you": "I'm doing great! Thanks for asking!",
-        "what is your name": "I'm a simple chatbot. No name yet, but you can call me Bot!",
-        "who are you": "I'm a simple chatbot here to chat with you!",
-        "bye": "Goodbye! Have a great day!",
-        "goodbye": "See you later! Take care!",
-        "help": "I can chat with you! Try: 'hello', 'weather [city]', 'news [topic]', or 'time'",
-        "python": "Python is an awesome programming language!",
-        "thanks": "You're welcome!",
-        "thank you": "Happy to help!",
-        "time": f"Current time: {datetime.now().strftime('%H:%M:%S')}",
-    }
-
-    # Check for weather command
-    if user_input.startswith("weather "):
-        city = user_input.replace("weather ", "").strip()
-        return get_weather(city)
-
-    # Check for news command
-    if user_input.startswith("news "):
-        topic = user_input.replace("news ", "").strip()
-        return get_news(topic)
-
-    # Check if user input matches any of our responses
-    for keyword, response in responses.items():
-        if keyword in user_input:
-            return response
-
-    return "I'm not sure how to respond to that. Try saying 'hello' or 'help'!"
+    """Get chatbot response using OpenAI Chat Completions API"""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful and professional AI assistant."
+                },
+                {
+                    "role": "user",
+                    "content": user_input
+                }
+            ]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Error getting response from AI: {str(e)}"
 
 
 @app.route('/')
