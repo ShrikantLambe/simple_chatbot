@@ -40,6 +40,14 @@
             color: white;
             padding: 20px;
             text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-content {
+            flex: 1;
+            text-align: center;
         }
 
         .header h1 {
@@ -50,6 +58,27 @@
         .header p {
             font-size: 12px;
             opacity: 0.9;
+        }
+
+        .clear-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            padding: 8px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .clear-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .clear-btn:active {
+            transform: scale(0.95);
         }
 
         .chat-box {
@@ -221,8 +250,12 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🤖 Simple Chatbot</h1>
-            <p>Chat with AI - Ask anything!</p>
+            <div></div>
+            <div class="header-content">
+                <h1>🤖 Simple Chatbot</h1>
+                <p>Chat with AI - Ask anything!</p>
+            </div>
+            <button id="clearBtn" class="clear-btn">🗑️ Clear</button>
         </div>
 
         <div class="chat-box" id="chatBox"></div>
@@ -242,6 +275,7 @@
         const chatBox = document.getElementById('chatBox');
         const messageInput = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
+        const clearBtn = document.getElementById('clearBtn');
 
         // Send message on button click
         sendBtn.addEventListener('click', sendMessage);
@@ -252,6 +286,9 @@
                 sendMessage();
             }
         });
+
+        // Clear chat on button click
+        clearBtn.addEventListener('click', clearChat);
 
         function sendMessage() {
             const userInput = messageInput.value.trim();
@@ -299,6 +336,27 @@
                     removeLoadingMessage();
                     console.error('Error:', error);
                     displayMessage('Sorry, an error occurred. Please try again.', 'bot');
+                });
+        }
+
+        function clearChat() {
+            // Send POST request to /clear
+            fetch('/clear', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    // Clear chat UI
+                    chatBox.innerHTML = '';
+                    // Show greeting
+                    displayMessage('👋 Hello! I\'m your chatbot. Ask me anything!', 'bot');
+                })
+                .catch(error => {
+                    console.error('Error clearing chat:', error);
+                    alert('Failed to clear chat. Please try again.');
                 });
         }
 

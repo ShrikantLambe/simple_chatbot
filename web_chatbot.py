@@ -137,6 +137,14 @@ def chat():
     return jsonify({'response': bot_response})
 
 
+@app.route('/clear', methods=['POST'])
+def clear():
+    """API endpoint for clearing conversation history"""
+    session.pop('history', None)
+    session.modified = True
+    return jsonify({'status': 'success', 'message': 'Chat history cleared'})
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
