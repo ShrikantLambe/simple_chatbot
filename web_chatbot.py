@@ -1,0 +1,114 @@
+from flask import Flask, render_template, request, jsonify
+import requests
+from datetime import datetime
+
+app = Flask(__name__)
+
+# API Keys
+WEATHER_API_KEY = "5b2379fef77321fc6eb8deaca147d101"
+NEWS_API_KEY = "8fb3025f05834eb6a8698df256c8ce6a"
+
+
+def get_weather(city):
+    """Fetch weather data for a city"""
+    try:
+        url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}&units=metric"
+        response = requests.get(url, timeout=5)
+
+        if response.status_code == 200:
+            data = response.json()
+            temp = data['main']['temp']
+            description = data['weather'][0]['description']
+            humidity = data['main']['humidity']
+            return f"In {city}: {temp}°C, {description.capitalize()}. Humidity: {humidity}%"
+        elif response.status_code == 401:
+            return "❌ Weather API Error: Invalid API key."
+        elif response.status_code == 404:
+            return f"❌ City '{city}' not found. Try a different city name."
+        else:
+            return f"❌ Weather API Error ({response.status_code})"
+    except Exception as e:
+        return f"❌ Error fetching weather: {str(e)}"
+
+
+def get_news(topic="general"):
+    """Fetch news headlines"""
+    try:
+        url = f"https://newsapi.org/v2/everything?q={topic}&sortBy=publishedAt&language=en&pageSize=3&apiKey={NEWS_API_KEY}"
+        response = requests.get(url, timeout=5)
+
+        if response.status_code == 200:
+            data = response.json()
+            articles = data['articles']
+
+            if not articles:
+                return "No news found for that topic."
+
+            news_text = f"📰 Top 3 {topic.capitalize()} News:\n"
+            for i, article in enumerate(articles[:3], 1):
+                news_text += f"{i}. {article['title']}\n"
+            return news_text
+        else:
+            return "Sorry, I couldn't fetch news."
+    except Exception as e:
+        return f"Error fetching news: {str(e)}"
+
+
+def get_chatbot_response(user_input):
+    """Get chatbot response based on user input"""
+    user_input = user_input.strip().lower()
+
+    responses = {
+        "hello": "Hi there! How are you doing today?",
+        "hi": "Hello! Nice to meet you!",
+        "how are you": "I'm doing great! Thanks for asking!",
+        "what is your name": "I'm a simple chatbot. No name yet, but you can call me Bot!",
+        "who are you": "I'm a simple chatbot here to chat with you!",
+        "bye": "Goodbye! Have a great day!",
+        "goodbye": "See you later! Take care!",
+        "help": "I can chat with you! Try: 'hello', 'weather [city]', 'news [topic]', or 'time'",
+        "python": "Python is an awesome programming language!",
+        "thanks": "You're welcome!",
+        "thank you": "Happy to help!",
+        "time": f"Current time: {datetime.now().strftime('%H:%M:%S')}",
+    }
+
+    # Check for weather command
+    if user_input.startswith("weather "):
+        city = user_input.replace("weather ", "").strip()
+        return get_weather(city)
+
+    # Check for news command
+    if user_input.startswith("news "):
+        topic = user_input.replace("news ", "").strip()
+        return get_news(topic)
+
+    # Check if user input matches any of our responses
+    for keyword, response in responses.items():
+        if keyword in user_input:
+            return response
+
+    return "I'm not sure how to respond to that. Try saying 'hello' or 'help'!"
+
+
+@app.route('/')
+def home():
+    """Serve the chatbot page"""
+    return render_template('index.html')
+
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    """API endpoint for handling chat messages"""
+    data = request.get_json()
+    user_message = data.get('message', '')
+
+    if not user_message:
+        return jsonify({'error': 'Empty message'}), 400
+
+    bot_response = get_chatbot_response(user_message)
+    return jsonify({'response': bot_response})
+
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
