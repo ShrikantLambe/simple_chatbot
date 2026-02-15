@@ -1,12 +1,21 @@
 from flask import Flask, render_template, request, jsonify
 import requests
 from datetime import datetime
+import os
+from dotenv import load_dotenv
+from openai import OpenAI
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 
-# API Keys
-WEATHER_API_KEY = "5b2379fef77321fc6eb8deaca147d101"
-NEWS_API_KEY = "8fb3025f05834eb6a8698df256c8ce6a"
+# Initialize OpenAI client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# API Keys from environment
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 
 
 def get_weather(city):
@@ -111,6 +120,5 @@ def chat():
 
 
 if __name__ == '__main__':
-    import os
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
