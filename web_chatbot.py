@@ -14,7 +14,8 @@ app = Flask(__name__)
 # Configure Flask-Session for production
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
-app.config['SESSION_USE_SIGNER'] = False  # Disable signer to avoid bytes/string errors
+# Disable signer to avoid bytes/string errors
+app.config['SESSION_USE_SIGNER'] = False
 # Use environment variable to control secure cookies in production
 app.config['SESSION_COOKIE_SECURE'] = os.getenv(
     'FLASK_ENV', 'development') == 'production'
@@ -23,17 +24,29 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SECRET_KEY'] = os.getenv(
     'SECRET_KEY', 'dev-key-change-in-production')
 app.config['JSON_SORT_KEYS'] = False
-app.config['SESSION_FILE_DIR'] = os.path.join(os.path.dirname(__file__), 'flask_session')  # Explicit session directory
+app.config['SESSION_FILE_DIR'] = os.path.join(os.path.dirname(
+    __file__), 'flask_session')  # Explicit session directory
 
 # Initialize Session
 Session(app)
 
-# Initialize OpenAI client lazily on first use
+# Initialize OpenAI client lazily on first use (only created when first message arrives)
 _openai_client = None
 
 
 def get_openai_client():
-    """Get or initialize OpenAI client"""
+    """
+    Get or initialize OpenAI client.
+
+    Lazy initialization ensures the API key is available at runtime
+    (important for Render environment variables).
+
+    Returns:
+        OpenAI: Initialized OpenAI client
+
+    Raises:
+        ValueError: If OPENAI_API_KEY environment variable is not set
+    """
     global _openai_client
     if _openai_client is None:
         api_key = os.getenv("OPENAI_API_KEY")
@@ -43,10 +56,14 @@ def get_openai_client():
                 "Please set it in your Render environment variables before running the app."
             )
         # Initialize OpenAI client - simple and direct
-        # The library will use the api_key automatically
+        # The library uses api_key automatically
         _openai_client = OpenAI(api_key=api_key)
     return _openai_client
 
+
+# ============================================================================
+# Optional: Weather and News APIs (not required for core functionality)
+# ============================================================================
 
 # API Keys from environment
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
@@ -54,7 +71,15 @@ NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 
 
 def get_weather(city):
-    """Fetch weather data for a city"""
+    """
+    Fetch weather data for a city using OpenWeather API.
+
+    Args:
+        city (str): City name
+
+    Returns:
+        str: Weather information or error message
+    """
     try:
         url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}&units=metric"
         response = requests.get(url, timeout=5)
@@ -76,7 +101,15 @@ def get_weather(city):
 
 
 def get_news(topic="general"):
-    """Fetch news headlines"""
+    """
+    Fetch latest news headlines using NewsAPI.
+
+    Args:
+        topic (str): Topic to search for
+
+    Returns:
+        str: Top 3 news headlines or error message
+    """
     try:
         url = f"https://newsapi.org/v2/everything?q={topic}&sortBy=publishedAt&language=en&pageSize=3&apiKey={NEWS_API_KEY}"
         response = requests.get(url, timeout=5)
@@ -99,12 +132,28 @@ def get_news(topic="general"):
 
 
 def get_chatbot_response(messages):
-    """Get chatbot response using OpenAI Chat Completions API with conversation history"""
+    """
+    Get AI-powered response using OpenAI Chat Completions API.
+
+    Maintains full conversation context by sending entire message history.
+
+    Args:
+        messages (list): List of message dicts with roles ('system', 'user', 'assistant')
+
+    Returns:
+        str: AI response text
+
+    Configuration:
+        - Model: gpt-4o-mini (latest, fastest, most affordable)
+        - Max tokens: 300 (response length limit)
+        - Temperature: 0.7 (balance between creative and consistent)
+    """
     try:
         response = get_openai_client().chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            max_tokens=300,
+            model="gpt-4o-mini",  # Latest OpenAI model: fast, cheap, smart
+            messages=messages,      # Full conversation history
+            max_tokens=300,         # Limit response length
+            # Creative but not random (0.0 = deterministic, 1.0 = creative)
             temperature=0.7
         )
         return response.choices[0].message.content
@@ -114,7 +163,7 @@ def get_chatbot_response(messages):
 
 @app.route('/')
 def home():
-    """Serve the chatbot page"""
+    """Render the chatbot web interface."""
     return render_template('index.html')
 
 
@@ -136,7 +185,9 @@ def chat():
             session['history'] = [
                 {
                     "role": "system",
-                    "content": "You are a helpful and professional AI assistant."
+                    "content": "You are a helpful, friendly, and professional AI assistant. "
+                    "Provide clear, concise answers. Be conversational but informative. "
+                    "When relevant, ask follow-up questions to better understand user needs."
                 }
             ]
 
