@@ -120,40 +120,50 @@ def home():
 @app.route('/chat', methods=['POST'])
 def chat():
     """API endpoint for handling chat messages with conversation history"""
-    data = request.get_json()
-    user_message = data.get('message', '')
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Invalid request - no JSON data'}), 400
+        
+        user_message = data.get('message', '').strip()
 
-    if not user_message:
-        return jsonify({'error': 'Empty message'}), 400
+        if not user_message:
+            return jsonify({'error': 'Empty message'}), 400
 
-    # Initialize conversation history if it doesn't exist
-    if 'history' not in session:
-        session['history'] = [
-            {
-                "role": "system",
-                "content": "You are a helpful and professional AI assistant."
-            }
-        ]
+        # Initialize conversation history if it doesn't exist
+        if 'history' not in session:
+            session['history'] = [
+                {
+                    "role": "system",
+                    "content": "You are a helpful and professional AI assistant."
+                }
+            ]
 
-    # Append user message to history
-    session['history'].append({
-        "role": "user",
-        "content": user_message
-    })
+        # Append user message to history
+        session['history'].append({
+            "role": "user",
+            "content": user_message
+        })
 
-    # Get response from OpenAI with full conversation history
-    bot_response = get_chatbot_response(session['history'])
+        # Get response from OpenAI with full conversation history
+        bot_response = get_chatbot_response(session['history'])
 
-    # Append assistant response to history
-    session['history'].append({
-        "role": "assistant",
-        "content": bot_response
-    })
+        # Append assistant response to history
+        session['history'].append({
+            "role": "assistant",
+            "content": bot_response
+        })
 
-    # Save session
-    session.modified = True
+        # Save session
+        session.modified = True
 
-    return jsonify({'response': bot_response})
+        return jsonify({'response': bot_response})
+    
+    except Exception as e:
+        print(f"Error in /chat endpoint: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 
 @app.route('/clear', methods=['POST'])
