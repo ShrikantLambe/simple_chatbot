@@ -14,7 +14,7 @@ app = Flask(__name__)
 # Configure Flask-Session for production
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = False
-app.config['SESSION_USE_SIGNER'] = True
+app.config['SESSION_USE_SIGNER'] = False  # Disable signer to avoid bytes/string errors
 # Use environment variable to control secure cookies in production
 app.config['SESSION_COOKIE_SECURE'] = os.getenv(
     'FLASK_ENV', 'development') == 'production'
@@ -23,6 +23,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SECRET_KEY'] = os.getenv(
     'SECRET_KEY', 'dev-key-change-in-production')
 app.config['JSON_SORT_KEYS'] = False
+app.config['SESSION_FILE_DIR'] = os.path.join(os.path.dirname(__file__), 'flask_session')  # Explicit session directory
 
 # Initialize Session
 Session(app)
@@ -124,7 +125,7 @@ def chat():
         data = request.get_json()
         if not data:
             return jsonify({'error': 'Invalid request - no JSON data'}), 400
-        
+
         user_message = data.get('message', '').strip()
 
         if not user_message:
@@ -158,7 +159,7 @@ def chat():
         session.modified = True
 
         return jsonify({'response': bot_response})
-    
+
     except Exception as e:
         print(f"Error in /chat endpoint: {str(e)}")
         import traceback
