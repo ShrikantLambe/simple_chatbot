@@ -161,6 +161,54 @@ def get_chatbot_response(messages):
         return f"Error getting response from AI: {str(e)}"
 
 
+def process_command(user_message):
+    """
+    Process special commands before sending to OpenAI.
+
+    Commands:
+    - "weather [city]" - Get weather for a city
+    - "news [topic]" - Get news headlines
+    - "time" - Get current time
+    - Others - Send to OpenAI
+
+    Args:
+        user_message (str): User's message to parse
+
+    Returns:
+        tuple: (response_text, is_command) - response and whether it was a command
+    """
+    message_lower = user_message.lower().strip()
+
+    # Check for weather command
+    if message_lower.startswith('weather '):
+        city = user_message[8:].strip()  # Get everything after "weather "
+        if city:
+            return get_weather(city), True
+        else:
+            return "Please specify a city: weather [city name]", True
+
+    # Check for news command
+    if message_lower.startswith('news '):
+        topic = user_message[5:].strip()  # Get everything after "news "
+        if topic:
+            return get_news(topic), True
+        else:
+            return get_news("general"), True
+
+    # Check for time command
+    if message_lower in ['time', 'what time', 'what time is it', 'current time']:
+        current_time = datetime.now().strftime("%I:%M %p")
+        current_date = datetime.now().strftime("%A, %B %d, %Y")
+        return f"Current time: {current_time} | Date: {current_date}", True
+
+    # Check for hello/hi
+    if message_lower in ['hello', 'hi', 'hey', 'greetings']:
+        return "Hello! 👋 I'm your AI assistant. How can I help you today?", True
+
+    # No command detected
+    return None, False
+
+
 @app.route('/')
 def home():
     """Render the chatbot web interface."""
@@ -191,20 +239,27 @@ def chat():
                 }
             ]
 
-        # Append user message to history
-        session['history'].append({
-            "role": "user",
-            "content": user_message
-        })
+        # Check if message is a special command
+        command_response, is_command = process_command(user_message)
 
-        # Get response from OpenAI with full conversation history
-        bot_response = get_chatbot_response(session['history'])
+        if is_command:
+            # Use command response directly
+            bot_response = command_response
+        else:
+            # Append user message to history
+            session['history'].append({
+                "role": "user",
+                "content": user_message
+            })
 
-        # Append assistant response to history
-        session['history'].append({
-            "role": "assistant",
-            "content": bot_response
-        })
+            # Get response from OpenAI with full conversation history
+            bot_response = get_chatbot_response(session['history'])
+
+            # Append assistant response to history
+            session['history'].append({
+                "role": "assistant",
+                "content": bot_response
+            })
 
         # Save session
         session.modified = True
