@@ -78,8 +78,18 @@ def get_weather(city):
         city (str): City name
 
     Returns:
-        str: Weather information or error message
+        str: Weather information or helpful message if API not configured
     """
+    # Check if API key is configured
+    if not WEATHER_API_KEY:
+        return (
+            f"🌤️ Weather API not configured. "
+            f"To enable weather lookup:\n"
+            f"1. Get free API key: https://openweathermap.org/api\n"
+            f"2. Add WEATHER_API_KEY to Render environment variables\n\n"
+            f"For now, try asking me: 'Tell me about weather in {city}'"
+        )
+    
     try:
         url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}&units=metric"
         response = requests.get(url, timeout=5)
@@ -91,7 +101,7 @@ def get_weather(city):
             humidity = data['main']['humidity']
             return f"In {city}: {temp}°C, {description.capitalize()}. Humidity: {humidity}%"
         elif response.status_code == 401:
-            return "❌ Weather API Error: Invalid API key."
+            return "❌ Weather API Error: Invalid API key. Please verify WEATHER_API_KEY in environment variables."
         elif response.status_code == 404:
             return f"❌ City '{city}' not found. Try a different city name."
         else:
@@ -108,8 +118,18 @@ def get_news(topic="general"):
         topic (str): Topic to search for
 
     Returns:
-        str: Top 3 news headlines or error message
+        str: Top 3 news headlines or helpful message if API not configured
     """
+    # Check if API key is configured
+    if not NEWS_API_KEY:
+        return (
+            f"📰 News API not configured. "
+            f"To enable news lookup:\n"
+            f"1. Get free API key: https://newsapi.org\n"
+            f"2. Add NEWS_API_KEY to Render environment variables\n\n"
+            f"For now, try asking me: 'Tell me about {topic} news'"
+        )
+    
     try:
         url = f"https://newsapi.org/v2/everything?q={topic}&sortBy=publishedAt&language=en&pageSize=3&apiKey={NEWS_API_KEY}"
         response = requests.get(url, timeout=5)
@@ -125,9 +145,12 @@ def get_news(topic="general"):
             for i, article in enumerate(articles[:3], 1):
                 news_text += f"{i}. {article['title']}\n"
             return news_text
+        elif response.status_code == 401:
+            return "❌ News API Error: Invalid API key. Please verify NEWS_API_KEY in environment variables."
         else:
-            return "Sorry, I couldn't fetch news."
+            return f"❌ News API Error ({response.status_code}). Please try again later."
     except Exception as e:
+        return f"❌ Error fetching news: {str(e)}"
         return f"Error fetching news: {str(e)}"
 
 
